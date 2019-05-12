@@ -1,5 +1,5 @@
 # Game Dev Journey
 
-### Week #5
+### Part#1 - Lua and Love2D
 
-Experimenting AI with zombies and LÖVE.
+Basic AI behaviour prototype
