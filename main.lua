@@ -2,6 +2,7 @@ io.stdout:setvbuf('no')
 love.graphics.setDefaultFilter("nearest")
 
 local l_sprites = {}
+local l_beckons = {}
 local human = {}
 local ZSTATES = {}
 ZSTATES.NONE = ''
@@ -41,13 +42,25 @@ function CreateSprite(pList, pType, pImage, pNbFrames)
 	return sprite
 end
 
+function createBeckon()
+	local beckon = {}
+	beckon.x = WIDTH/2
+	beckon.y = HEIGHT/2
+	beckon.h = 40
+	beckon.w = 40
+	beckon.color = {1, 0, 0}
+	beckon.range = 200
+	table.insert(l_beckons, beckon)
+	return beckon
+end
+
 function CreateZombie()
 	local zombie = CreateSprite(l_sprites, 'zombie', 'zombie', 2)
 
-	zombie.x = love.math.random(10, WIDTH)
-	zombie.y = love.math.random(10, HEIGHT / 2)
+	zombie.x = love.math.random(10, WIDTH/4)
+	zombie.y = love.math.random(10, HEIGHT/4)
 	zombie.speed = love.math.random(5, 50) / 200
-	zombie.range = love.math.random(10, 150)
+	zombie.range = love.math.random(10, 250)
 	zombie.target = nil
 	zombie.state = ZSTATES.NONE	
 end
@@ -93,20 +106,30 @@ function UpdateZombie(pZombie, pEntities)
 		end
 		----
 
+		do
+			local i
+			for i, beckon in ipairs(l_beckons) do
+				local dist = math.dist(pZombie.x, pZombie.y, beckon.x, beckon.y)
+				if dist <= beckon.range then
+					pZombie.state = ZSTATES.CHANGEDIR
+				end
+			end
+		end
+
 	elseif pZombie.state == ZSTATES.ATTACK then
 
 		if pZombie.target == nil then
 			pZombie.state = ZSTATES.CHANGEDIR
 		elseif math.dist(pZombie.x, pZombie.y, pZombie.target.x, pZombie.target.y) > pZombie.range and pZombie.target.type == 'human' then
 			pZombie.state = ZSTATES.CHANGEDIR
-		elseif math.dist(pZombie.x, pZombie.y, pZombie.target.x, pZombie.target.y) < 5 and pZombie.target.type == 'human' then
+		elseif math.dist(pZombie.x, pZombie.y, pZombie.target.x, pZombie.target.y) < 10 and pZombie.target.type == 'human' then
 			pZombie.state = ZSTATES.BITE
 			pZombie.vx = 0
 			pZombie.vy = 0
 		else
 			local chaosDestX, chaosDestY
-			chaosDestX = love.math.random(pZombie.target.x - 10, pZombie.target.x + 10)
-			chaosDestY = love.math.random(pZombie.target.y - 10, pZombie.target.y + 10)
+			chaosDestX = love.math.random(pZombie.target.x - 20, pZombie.target.x + 20)
+			chaosDestY = love.math.random(pZombie.target.y - 20, pZombie.target.y + 20)
 
 			local angle = math.angle(pZombie.x, pZombie.y, chaosDestX, chaosDestY)
 			pZombie.vx = pZombie.speed * 2 * 60 * math.cos(angle)
@@ -115,7 +138,7 @@ function UpdateZombie(pZombie, pEntities)
 
 	elseif pZombie.state == ZSTATES.BITE then
 
-		if math.dist(pZombie.x, pZombie.y, pZombie.target.x, pZombie.target.y) > 5 and pZombie.target.type == 'human' then
+		if math.dist(pZombie.x, pZombie.y, pZombie.target.x, pZombie.target.y) > 10 and pZombie.target.type == 'human' then
 			pZombie.state = ZSTATES.ATTACK
 		end
 
@@ -142,13 +165,18 @@ function CreateHuman()
 	human = CreateSprite(l_sprites, 'human', 'player', 4)
 	human.x = WIDTH - WIDTH / 6
 	human.y = HEIGHT - HEIGHT / 6
-	human.life = 100
+	human.life = 10
+	human.visible = true
+	human.dead = false
+	human.alpha = 1
+	human.speed = 4
 
 	human.Hurt = function()
 		human.life = human.life - 0.1
 		if human.life <= 0 then
 			human.life = 0
 			human.visible = false
+			human.dead = true
 		end
 	end
 
@@ -161,14 +189,17 @@ function love.load()
 	HEIGHT = love.graphics.getHeight()
 
 	human = CreateHuman()
+	human.img_dead = love.graphics.newImage('images/dead_1.png')
 
-	nb_zombies = 50
+	nb_zombies = 150
 	img_alert = love.graphics.newImage('images/alert.png')
 	
 	local n
 	for n = 1, nb_zombies do
 		CreateZombie()
 	end
+
+	createBeckon()
 end
 
 function love.update(dt)
@@ -191,28 +222,44 @@ function love.update(dt)
 		end
 	end
 
-	if love.keyboard.isDown('up') then
-		human.y = human.y - 5 * (60*dt)
-	end
+	if human.dead == false then
 
-	if love.keyboard.isDown('right') then
-		human.x = human.x + 5 * (60*dt)
-	end
+		if love.keyboard.isDown('up') then
+			human.y = human.y - human.speed * (60*dt)
+		end
 
-	if love.keyboard.isDown('down') then
-		human.y = human.y + 5 * (60*dt)
-	end
+		if love.keyboard.isDown('right') then
+			human.x = human.x + human.speed * (60*dt)
+		end
 
-	if love.keyboard.isDown('left') then
-		human.x = human.x - 5 * (60*dt)
+		if love.keyboard.isDown('down') then
+			human.y = human.y + human.speed * (60*dt)
+		end
+
+		if love.keyboard.isDown('left') then
+			human.x = human.x - human.speed * (60*dt)
+		end
+	
 	end
 
 end
 
 function love.draw()
 
+	love.graphics.setBackgroundColor(0,0,0)
+
 	str_life = "LIFE : " .. tostring(math.floor(human.life))
 	love.graphics.print(str_life, 10, 10, 0, 2, 2)
+
+	do
+		local i
+		for i, beckon in ipairs(l_beckons) do
+			love.graphics.setColor(beckon.color)
+			love.graphics.rectangle('fill', beckon.x, beckon.y, beckon.w, beckon.h)
+			love.graphics.setColor(1,1,1)
+			love.graphics.circle('line', beckon.x, beckon.y, beckon.range)
+		end
+	end
 
 	local i
 	for i, sprite in ipairs(l_sprites) do
@@ -223,6 +270,12 @@ function love.draw()
 			if sprite.type == 'zombie' then
 				if sprite.state == ZSTATES.ATTACK then
 					love.graphics.draw(img_alert, sprite.x, sprite.y - sprite.height - 10, 0, 2, 2)
+				end
+			end
+		else
+			if sprite.type == 'human' then
+				if sprite.life == 0 then
+					love.graphics.draw(human.img_dead, sprite.x, sprite.y, 0, 2, 2)
 				end
 			end
 		end
